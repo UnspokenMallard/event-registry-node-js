@@ -524,6 +524,10 @@ export class EventRegistry {
         return request.data as ER.UsageInfo;
     }
 
+    /**
+     * Return the GET URL for the query. Parameters are URL-encoded, arrays become repeated keys,
+     * objects are JSON-encoded, and apiKey is always left out so the URL is safe to log or share.
+     */
     public getUrl(query: QueryArticles | QueryArticle | QueryEvents | QueryEvent) {
         if (!(query instanceof QueryParamsBase)) {
             if (this.config.verboseOutput) {
@@ -531,7 +535,24 @@ export class EventRegistry {
             }
         }
         const allParams = query.getQueryParams();
-        return `${this.config?.host}${query?.path}?${Object.keys(allParams).map(key => `${key}=${allParams[key]}`).join("&")}`;
+        const searchParams = new URLSearchParams();
+        const append = (key: string, value: unknown) => {
+            if (value === undefined || value === null) {
+                return;
+            }
+            searchParams.append(key, typeof value === "object" ? JSON.stringify(value) : String(value));
+        };
+        for (const [key, value] of Object.entries(allParams)) {
+            if (key === "apiKey") {
+                continue;
+            }
+            if (Array.isArray(value)) {
+                value.forEach((item) => append(key, item));
+            } else {
+                append(key, value);
+            }
+        }
+        return `${this.config?.host}${query?.path}?${searchParams.toString()}`;
     }
 
     /**
