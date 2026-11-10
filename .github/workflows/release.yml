@@ -2,7 +2,8 @@ name: Release
 
 # Publishes to npm when a push to master carries a package.json version that
 # is not on npm yet. Bump "version" (and CHANGELOG.md) in the PR; merging it
-# publishes and tags the release.
+# publishes, tags and creates the GitHub release. The full CI workflow must
+# pass first.
 
 on:
   push:
@@ -14,13 +15,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  ci:
     # workflow_dispatch can target any branch; only master may publish.
     if: github.ref == 'refs/heads/master'
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  publish:
+    needs: ci
     runs-on: ubuntu-latest
     permissions:
-      contents: write # push the vX.Y.Z tag
+      contents: write # push the vX.Y.Z tag and create the release
       id-token: write # npm trusted publishing + provenance
+    env:
+      HAS_NPM_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -33,6 +42,7 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          git fetch --tags --quiet
           if npm view "eventregistry@$VERSION" version >/dev/null 2>&1; then
             echo "eventregistry@$VERSION is already on npm; nothing to publish."
             echo "publish=false" >> "$GITHUB_OUTPUT"
@@ -44,25 +54,50 @@ jobs:
       - if: steps.version.outputs.publish == 'true'
         run: npm run build
       - if: steps.version.outputs.publish == 'true'
-        run: npm run lint
+        run: npm run example:check
       - if: steps.version.outputs.publish == 'true'
-        run: npm run test:unit
-      - if: steps.version.outputs.publish == 'true'
-        run: npm test
-      - if: steps.version.outputs.publish == 'true'
-        name: Publish to npm
-        # Uses npm trusted publishing (OIDC) when configured on npmjs.com;
-        # falls back to the NPM_TOKEN repository secret otherwise.
+        run: npm run check:package
+      # Lint and tests already ran in the ci job above.
+      - if: steps.version.outputs.publish == 'true' && env.HAS_NPM_TOKEN != 'true'
+        name: Publish to npm (trusted publishing, OIDC)
+        # No NODE_AUTH_TOKEN here on purpose: an empty token can block the OIDC path.
+        run: |
+          NPM_VERSION=$(npm -v)
+          if [ "$(printf '%s\n' 11.5.1 "$NPM_VERSION" | sort -V | head -n1)" != "11.5.1" ]; then
+            echo "npm $NPM_VERSION is too old for trusted publishing (needs >= 11.5.1)."
+            exit 1
+          fi
+          npm publish --provenance --access public
+      - if: steps.version.outputs.publish == 'true' && env.HAS_NPM_TOKEN == 'true'
+        name: Publish to npm (NPM_TOKEN fallback)
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - if: steps.version.outputs.publish == 'true'
         name: Tag the release
         run: |
-          TAG="v${{ steps.version.outputs.version }}"
-          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
-            echo "$TAG already exists; skipping."
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="v$VERSION"
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" "refs/tags/$VERSION" >/dev/null; then
+            echo "A tag for $VERSION already exists; skipping."
           else
             git tag "$TAG"
             git push origin "$TAG"
+          fi
+      - if: steps.version.outputs.publish == 'true'
+        name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="v$VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; skipping."
+            exit 0
+          fi
+          awk -v h="## [v$VERSION]" 'index($0,h)==1{f=1;next} /^## /{f=0} f' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          if [ -s "$RUNNER_TEMP/release-notes.md" ]; then
+            gh release create "$TAG" --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/release-notes.md"
+          else
+            gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes
           fi
