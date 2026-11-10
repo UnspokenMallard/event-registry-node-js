@@ -191,7 +191,7 @@ export class QueryEventsIter extends QueryEvents implements AsyncIterable<Data.E
     private readonly engine: QueryIterationEngine<Data.Event>;
 
     constructor(er: EventRegistry, args: ER.QueryEvents.IteratorArguments = {}) {
-        super(args as ER.QueryEvents.Arguments);
+        super(args);
         const {
             sortBy = "rel",
             sortByAsc = false,

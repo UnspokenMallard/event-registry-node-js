@@ -179,7 +179,7 @@ export class QueryEventArticlesIter extends QueryEvent implements AsyncIterable<
     public execQuery(callback: (item: Data.Article) => void, doneCallback?: (error?: string) => void): void {
         if (callback) { this.callback = callback; }
         if (doneCallback) { this.doneCallback = doneCallback; }
-        this.iterate();
+        void this.iterate(); // errors surface through doneCallback; the callback API returns no promise
     }
 
     private async iterate(): Promise<void> {

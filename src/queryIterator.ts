@@ -45,7 +45,7 @@ export class QueryIterationEngine<TItem> implements AsyncIterable<TItem> {
     public execQuery(callback: (item: TItem) => void, doneCallback?: (error?: string) => void): void {
         if (callback) { this.callback = callback; }
         if (doneCallback) { this.doneCallback = doneCallback; }
-        this.iterate();
+        void this.iterate(); // errors surface through doneCallback; the callback API returns no promise
     }
 
     private get current(): TItem | undefined {

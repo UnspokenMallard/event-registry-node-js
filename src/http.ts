@@ -101,6 +101,8 @@ export async function erFetch<T = unknown>(req: ErHttpRequest): Promise<ErHttpRe
                 throw error;
             }
             if (retry >= 0 && attempt >= retry) {
+                // Rethrow the original thrown value (it may not be an Error) with the retry count attached.
+                // eslint-disable-next-line @typescript-eslint/only-throw-error
                 throw Object.assign(error as object, { __retryCount: attempt });
             }
             attempt += 1;

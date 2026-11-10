@@ -350,7 +350,7 @@ export class EventRegistry {
                 requestHeaders = {...(headers as Record<string, string>)};
             }
             if (!!cookies) {
-                const cookieString = Object.keys(cookies).map((key) => key + "=" + cookies[key]).join(";") + ";";
+                const cookieString = Object.keys(cookies).map((key) => key + "=" + String(cookies[key])).join(";") + ";";
                 requestHeaders = {...requestHeaders, Cookie: cookieString};
             }
             try {
@@ -383,7 +383,7 @@ export class EventRegistry {
                 if (err && err.stack && err.message) {
                     this.logger.error(err.message);
                 } else {
-                    this.logger.error(`${err?.response?.status}: ${err?.response?.statusText} => ${err?.response?.data}`);
+                    this.logger.error(`${err?.response?.status}: ${err?.response?.statusText} => ${String(err?.response?.data)}`);
                 }
             }
             // try to print out the error that should be passed by in case the server is down or responds with errors
@@ -455,7 +455,7 @@ export class EventRegistry {
                 if (err && err.stack && err.message) {
                     this.logger.error(err.message);
                 } else {
-                    this.logger.error(`${err?.response?.status}: ${err?.response?.statusText} => ${err?.response?.data}`);
+                    this.logger.error(`${err?.response?.status}: ${err?.response?.statusText} => ${String(err?.response?.data)}`);
                 }
             }
             if (this.config?.logging) {
@@ -540,6 +540,8 @@ export class EventRegistry {
             if (value === undefined || value === null) {
                 return;
             }
+            // Objects are serialised above, so only primitives reach String().
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string
             searchParams.append(key, typeof value === "object" ? JSON.stringify(value) : String(value));
         };
         for (const [key, value] of Object.entries(allParams)) {

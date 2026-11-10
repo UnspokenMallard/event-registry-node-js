@@ -186,7 +186,7 @@ export class QueryMentionsIter extends QueryMentions implements AsyncIterable<Re
     private errorMessage!: string;
 
     constructor(er: EventRegistry, args: ER.QueryMentions.IteratorArguments = {}) {
-        super(args as ER.QueryMentions.Arguments);
+        super(args);
         const {
             sortBy = "rel",
             sortByAsc = false,
@@ -230,7 +230,7 @@ export class QueryMentionsIter extends QueryMentions implements AsyncIterable<Re
      public execQuery(callback: (item: Record<string, unknown>) => void, doneCallback?: (error?: string) => void) {
         if (callback) { this.callback = callback; }
         if (doneCallback) { this.doneCallback = doneCallback; }
-        this.iterate();
+        void this.iterate(); // errors surface through doneCallback; the callback API returns no promise
     }
 
     public static initWithComplexQuery(er: EventRegistry, complexQuery: string | Record<string, unknown>, args: ER.QueryMentions.IteratorArguments = {}) {
