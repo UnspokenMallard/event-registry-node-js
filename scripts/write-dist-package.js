@@ -17,7 +17,8 @@ function rewriteEsmSpecifiers(directory) {
         const entryPath = path.join(directory, entry.name);
         if (entry.isDirectory()) {
             rewriteEsmSpecifiers(entryPath);
-        } else if (entry.name.endsWith(".js")) {
+        } else if (entry.name.endsWith(".js") || entry.name.endsWith(".d.ts")) {
+            // .d.ts too: dist/esm is "type": "module", so node16/nodenext consumers need explicit extensions in typings.
             const source = fs.readFileSync(entryPath, "utf8")
                 .replace(/(\bfrom\s+["'])(\.[^"']+)(["'])/g, addJsExtension)
                 .replace(/(\bimport\s*["'])(\.[^"']+)(["'])/g, addJsExtension)
