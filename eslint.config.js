@@ -5,11 +5,15 @@ module.exports = tseslint.config(
         ignores: ["dist/**", "node_modules/**"],
     },
     ...tseslint.configs.recommended,
+    // Type-aware rules (no-floating-promises, no-misused-promises, ...) for the library source.
+    ...tseslint.configs.recommendedTypeChecked.map((config) => ({ ...config, files: ["src/**/*.ts"] })),
     {
         files: ["src/**/*.ts"],
         languageOptions: {
             parserOptions: {
                 sourceType: "module",
+                project: "./tsconfig.eslint.json",
+                tsconfigRootDir: __dirname,
             },
         },
         rules: {
@@ -61,6 +65,12 @@ module.exports = tseslint.config(
             "prefer-const": "error",
             "spaced-comment": ["error", "always", { markers: ["/"] }],
             "use-isnan": "error",
+            // API responses are untyped JSON, so the no-unsafe-* family only produces noise here.
+            "@typescript-eslint/no-unsafe-assignment": "off",
+            "@typescript-eslint/no-unsafe-argument": "off",
+            "@typescript-eslint/no-unsafe-member-access": "off",
+            "@typescript-eslint/no-unsafe-return": "off",
+            "@typescript-eslint/no-unsafe-call": "off",
         },
     },
 );
