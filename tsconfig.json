@@ -5,13 +5,13 @@
         "skipLibCheck": true,
         "esModuleInterop": true,
         "strict": true,
-        "moduleResolution": "node16",
         "declaration": true,
         "sourceMap": true,
         "alwaysStrict": true,
+        "rootDir": "./src",
         "outDir": "dist/",
-        "typeRoots": [
-            "node_modules/@types"
+        "types": [
+            "node"
         ],
         "lib": [
             "ES2020"
