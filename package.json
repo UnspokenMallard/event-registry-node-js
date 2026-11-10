@@ -39,7 +39,7 @@
     "build:watch": "npm run clean && tsc --watch --project tsconfig.cjs.json",
     "lint": "eslint \"src/**/*.ts\"",
     "example:check": "tsc --noEmit -p examples/tsconfig.json",
-    "example": "npx --yes tsx --tsconfig examples/tsconfig.json",
+    "example": "tsx --tsconfig examples/tsconfig.json",
     "pretest": "tsc --project ./test/tsconfig.json",
     "test": "jasmine --config=./test/jasmine.json",
     "test:live": "node scripts/run-tests-with-mode.js live",
@@ -59,6 +59,7 @@
     "jasmine": "5.12.0",
     "publint": "^0.3.25",
     "rimraf": "^5.0.10",
+    "tsx": "4.23.15",
     "typescript": "5.8.3",
     "typescript-eslint": "^8.72.2",
     "vitest": "^5.1.0"
