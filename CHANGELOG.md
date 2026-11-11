@@ -2,6 +2,25 @@
 
 This log contains changes specific to the NodeJS SDK.
 
+## [v10.1.0](https://www.npmjs.com/package/eventregistry/v/10.1.0) (2026-11-11)
+
+Additive release on top of `10.0.0`; nothing was removed or renamed. **The classic class-based API is permanent**: it carries no `@deprecated` tags and there is no plan to remove it. See [MIGRATION.md](MIGRATION.md#the-classic-api-is-permanent).
+
+**Added**
+ - Typed `ErApiError` for failed HTTP calls (status, API error code and message, request id, token cost, `Retry-After`). `execQuery` error responses expose it as `apiError` next to the existing string `error`.
+ - Retry backoff is now exponential with jitter (base `retryDelayMs`, capped at `maxRetryDelayMs`) and honours `Retry-After` on 429 and 503. The default of retrying indefinitely (`repeatFailedRequestCount: -1`) is unchanged.
+ - Cancellation and deadlines: `signal` (an `AbortSignal`) and `timeoutMs` in the constructor config, per call on the classic `execQuery`/`getUsageInfo`/`getRemainingTokens` options, and for helpers and fluent calls through `er.withOptions({ signal, timeoutMs })`. The signal also stops requests waiting in the queue and pending backoff waits. Timeouts reject with `ErTimeoutError`.
+ - Usage accounting and an optional budget guard: `er.usage` (last call and session totals from the `req-tokens`, `req-action` and `req-archive` headers) and the `maxTokens` option, which rejects with `ErBudgetExceededError` before a call that would exceed the budget. The guard estimates the next call from the last cost of the same endpoint, so it can overshoot by one call.
+ - `er.recent.articles()` and `er.recent.events()` return a `RecentFeed`: `await` it for one poll (as before) or iterate it with `for await` to poll continuously, with `pollMs`, a resumable cursor (`getCursor`/`setCursor`, `onCursor`), `signal` and `timeoutMs`. `recentArticlesFeed` and `recentEventsFeed` are exported for direct use.
+ - Opt-in `validate: true`: responses are checked with hand-written guards for the top-level shapes of articles, events, mentions, URI/weight lists, aggregates and concept trends, and a mismatch throws `ErValidationError`. Unknown fields are ignored. Off by default.
+ - API reference generated with TypeDoc and published to GitHub Pages (`npm run docs`).
+ - [AGENT-RECIPES.md](AGENT-RECIPES.md) and a runnable `examples/agentRecipesExamples.ts` for the suggest, scan, triage, retrieve workflow.
+ - CI imports the ESM build in Bun and in workerd (through Miniflare) and constructs the client. Supported runtimes are listed in the README.
+ - A weekly workflow re-records the test fixtures against the live API and publishes the diff as an artifact. It never commits or merges.
+
+**Changed**
+ - The package imports `node:fs` and `node:path` (was `fs` and `path`). Behaviour on Node is identical; on Cloudflare Workers the `nodejs_compat` flag is required.
+
 ## [v10.0.0](https://www.npmjs.com/package/eventregistry/v/10.0.0) (2026-10-09)
 
 Upgrade guide for the last published line (`9.1.1`): [MIGRATION.md](MIGRATION.md). **The classic class-based API (`QueryArticles`, `QueryEvents`, `execQuery()`, iterators, complex queries, …) remains fully supported** — class names were not removed or renamed.

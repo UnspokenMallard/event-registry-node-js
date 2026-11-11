@@ -59,7 +59,7 @@ The same style is available for `er.events`, `er.mentions`, `er.stories`, `er.tr
 
 ### Classic API (fully supported)
 
-The classic class-based API — `QueryArticles`, `QueryEvents`, `Request*Info`, iterators, complex queries, `er.execQuery()` — is **fully supported** in `10.0.0` and is not going anywhere. Class names from `9.1.1` were not removed; some defaults and return shapes did change (HTTPS hosts, delay, retries, `GetRecentEvents`). See [MIGRATION.md](MIGRATION.md). The fluent/helpers layer is additive sugar over the same classes.
+The classic class-based API — `QueryArticles`, `QueryEvents`, `Request*Info`, iterators, complex queries, `er.execQuery()` — is **permanent**: it is fully supported, carries no deprecation tags and will not be removed. Class names from `9.1.1` were not removed; some defaults and return shapes did change (HTTPS hosts, delay, retries, `GetRecentEvents`). See [MIGRATION.md](MIGRATION.md). The fluent/helpers layer is additive sugar over the same classes.
 
 ```typescript
 import { EventRegistry, QueryArticles, RequestArticlesInfo, QueryArticlesIter } from "eventregistry";

@@ -12,6 +12,10 @@ There was no published `9.1.2` or `11.0.0`. Everything that landed on `developme
 - New in 10.0.0: an optional ergonomic surface (`er.articles`, `searchArticles()`, `conceptUri()`, …) that wraps the same classic classes.
 - Under the hood: Axios → native `fetch`, Winston → a lightweight built-in `Logger`, moment → `Date`, dual CJS/ESM, TypeScript `strict`.
 
+## The classic API is permanent
+
+The classic class-based API (`QueryArticles`, `QueryEvents`, `Request*`, iterators, complex queries, `er.execQuery()`) is a permanent part of this package, not a stepping stone. It carries no `@deprecated` tags, no codemod is planned and it will not be removed in a future major. The helpers and fluent namespaces are thin wrappers over it, so both surfaces get the same fixes and features. Pick whichever reads better; mixing them in one codebase is fine.
+
 ## 1. Classic API — still supported; runtime defaults changed
 
 This `9.1.1` pattern is still valid:
