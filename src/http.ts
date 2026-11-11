@@ -1,3 +1,5 @@
+import { ErApiError, parseRetryAfter } from "./errors";
+
 export interface ErHttpResponse<T = unknown> {
     data: T;
     status: number;
@@ -12,13 +14,54 @@ export interface ErHttpRequest {
     headers?: Record<string, string>;
     timeoutMs?: number;
     retry?: number;
+    /** Base of the backoff schedule: attempt n waits about `retryDelayMs * 2^n`, capped at `maxRetryDelayMs`. */
     retryDelayMs?: number;
+    maxRetryDelayMs?: number;
     stopStatusCodes?: number[];
     responseType?: "json" | "text";
 }
 
 function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Exponential backoff with equal jitter; the fixed `retryDelayMs` is the base of the schedule. */
+function backoffDelay(attempt: number, baseMs: number, maxMs: number): number {
+    const capped = Math.min(maxMs, baseMs * 2 ** Math.min(attempt, 30));
+    return Math.round(capped / 2 + Math.random() * (capped / 2));
+}
+
+function scalarText(value: unknown): string | undefined {
+    return typeof value === "string" || typeof value === "number" ? String(value) : undefined;
+}
+
+async function toApiError(response: Response): Promise<ErApiError> {
+    let apiError: string | undefined;
+    let apiCode: string | undefined;
+    try {
+        const body = JSON.parse(await response.text()) as Record<string, unknown>;
+        const err = body?.error;
+        if (typeof err === "string") {
+            apiError = err;
+        } else if (err && typeof err === "object") {
+            const obj = err as Record<string, unknown>;
+            apiError = typeof obj.message === "string" ? obj.message : undefined;
+            apiCode = scalarText(obj.code);
+        }
+        apiCode ??= scalarText(body?.errorCode);
+    } catch {
+        // body is empty or not JSON: status line is all we have
+    }
+    const tokens = Number(response.headers.get("req-tokens"));
+    return new ErApiError({
+        status: response.status,
+        statusText: response.statusText,
+        apiCode,
+        apiError,
+        requestId: response.headers.get("x-request-id") ?? response.headers.get("req-id") ?? undefined,
+        tokens: response.headers.has("req-tokens") && Number.isFinite(tokens) ? tokens : undefined,
+        retryAfterMs: parseRetryAfter(response.headers.get("retry-after"))
+    });
 }
 
 function isFetchNetworkError(error: unknown): boolean {
@@ -42,6 +85,7 @@ export async function erFetch<T = unknown>(req: ErHttpRequest): Promise<ErHttpRe
     const timeoutMs = req.timeoutMs ?? 600_000;
     const retry = req.retry ?? 0;
     const retryDelayMs = req.retryDelayMs ?? 5000;
+    const maxRetryDelayMs = req.maxRetryDelayMs ?? 30_000;
     const stopStatusCodes = req.stopStatusCodes ?? [204, 400, 401, 403, 530];
     const serializedBody = req.body !== undefined ? JSON.stringify(req.body) : undefined;
 
@@ -76,21 +120,21 @@ export async function erFetch<T = unknown>(req: ErHttpRequest): Promise<ErHttpRe
                 };
             }
 
+            const apiError = await toApiError(response);
             if (stopStatusCodes.includes(response.status)) {
-                throw Object.assign(new Error(response.statusText || `HTTP ${response.status}`), {
-                    response: { status: response.status, statusText: response.statusText }
-                });
+                throw apiError;
             }
 
             if (retry >= 0 && attempt >= retry) {
-                throw Object.assign(new Error(response.statusText || `HTTP ${response.status}`), {
-                    response: { status: response.status, statusText: response.statusText },
-                    __retryCount: attempt
-                });
+                throw Object.assign(apiError, { __retryCount: attempt });
             }
 
+            const honourRetryAfter = response.status === 429 || response.status === 503;
+            const delay = honourRetryAfter && apiError.retryAfterMs !== undefined
+                ? apiError.retryAfterMs
+                : backoffDelay(attempt, retryDelayMs, maxRetryDelayMs);
             attempt += 1;
-            await sleep(retryDelayMs);
+            await sleep(delay);
         } catch (error) {
             clearTimeout(timer);
             const status = (error as { response?: { status?: number } })?.response?.status;
@@ -105,8 +149,9 @@ export async function erFetch<T = unknown>(req: ErHttpRequest): Promise<ErHttpRe
                 // eslint-disable-next-line @typescript-eslint/only-throw-error
                 throw Object.assign(error as object, { __retryCount: attempt });
             }
+            const delay = backoffDelay(attempt, retryDelayMs, maxRetryDelayMs);
             attempt += 1;
-            await sleep(retryDelayMs);
+            await sleep(delay);
         }
     }
 }
