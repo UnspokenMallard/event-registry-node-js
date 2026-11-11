@@ -8,6 +8,8 @@ Node.js 24.11.0 is the supported development target. Starting with `10.0.0`, Nod
 
 API reference (generated with TypeDoc from the strict build): https://eventregistry.github.io/event-registry-node-js/ — run `npm run docs` to build it locally into `docs-site/`.
 
+Building an agent or an unattended pipeline? See [AGENT-RECIPES.md](AGENT-RECIPES.md) for the suggest, scan, triage, retrieve pattern plus budgets, cancellation and resumable feeds.
+
 ### Installation
 
 Event Registry package can be installed using the NodeJS Package Manager. Type the following in the command line:
