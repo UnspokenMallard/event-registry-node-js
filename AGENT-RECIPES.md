@@ -76,3 +76,11 @@ for await (const article of er.recent.articles({
 ```
 
 Store the cursor wherever your job keeps state. Without one, the feed starts at the stream's current position and skips what was published while the job was down.
+
+## Refuse malformed data
+
+A pipeline that acts on responses should not continue on a payload that lost its results array. Set `validate: true` and every `execQuery` response is checked against the documented top-level shapes; a mismatch throws `ErValidationError` listing each problem by JSON path. Unknown extra fields never fail the check, so API additions do not break you. The option is off by default.
+
+```ts
+const er = new EventRegistry({ apiKey, validate: true });
+```

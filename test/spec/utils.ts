@@ -101,6 +101,8 @@ export class Utils {
             // Live runs must fail fast: never retry a failed request. The SDK default (-1)
             // retries forever and turns one outage into a hung suite.
             repeatFailedRequestCount: 0,
+            // Fail loudly when a recorded or live response drifts from the documented shapes.
+            validate: true,
         });
     }
 

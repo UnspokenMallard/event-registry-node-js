@@ -85,3 +85,21 @@ export class ErBudgetExceededError extends Error {
         Object.setPrototypeOf(this, new.target.prototype);
     }
 }
+
+/**
+ * Thrown by `EventRegistry` when `validate: true` is set and a response does not have the documented shape.
+ * Unknown extra fields never fail validation; only missing or mistyped documented fields do.
+ */
+export class ErValidationError extends Error {
+    /** One line per problem, each starting with the JSON path, e.g. `articles.results[3].uri: expected a string`. */
+    public readonly issues: string[];
+    public readonly path: string;
+
+    constructor(path: string, issues: string[]) {
+        super(`Unexpected response shape from ${path}: ${issues.slice(0, 3).join("; ")}${issues.length > 3 ? ` (+${issues.length - 3} more)` : ""}`);
+        this.name = "ErValidationError";
+        this.issues = issues;
+        this.path = path;
+        Object.setPrototypeOf(this, new.target.prototype);
+    }
+}

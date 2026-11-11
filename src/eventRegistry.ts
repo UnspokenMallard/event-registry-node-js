@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import { Mutex } from "./mutex";
-import { ErApiError, ErBudgetExceededError } from "./errors";
+import { ErApiError, ErBudgetExceededError, ErValidationError } from "./errors";
+import { validateResponse } from "./guards";
 import { Usage } from "./usage";
 import { abortableSleep, composeSignal } from "./abort";
 import { erFetch, ErHttpResponse } from "./http";
@@ -364,7 +365,14 @@ export class EventRegistry {
         if (!request?.data && this.config?.verboseOutput) {
             this.logger.error("Request did not return with the 'data' property.");
         }
-        return (request?.data || {} as ER.Response<T>);
+        const data = request?.data || {} as ER.Response<T>;
+        if (this.config.validate) {
+            const issues = validateResponse(data);
+            if (issues.length > 0) {
+                throw new ErValidationError(query.path, issues);
+            }
+        }
+        return data;
     }
 
     /** Merge instance/view defaults with per-call options into one signal (caller must `dispose()`). */

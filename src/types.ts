@@ -61,6 +61,13 @@ export namespace ER {
 
     export interface Config extends RequestOptions {
         /**
+         * Check every `execQuery` response against the documented top-level shapes and throw `ErValidationError`
+         * when one does not match (a missing results array, a result without a uri, a non-numeric counter, ...).
+         * Off by default; extra fields never fail validation. Meant for tests and for pipelines that must not
+         * continue on malformed data.
+         */
+        validate?: boolean;
+        /**
          * Token budget for this client. Once the tokens reported by the API since construction (or `usage.reset()`)
          * plus the last reported cost of the same endpoint would exceed it, calls throw `ErBudgetExceededError`
          * before any request is sent. The cost of a call is only known afterwards, so the guard can overshoot by one call.
