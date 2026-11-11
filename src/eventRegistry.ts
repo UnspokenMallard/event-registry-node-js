@@ -1,4 +1,4 @@
-import * as fs from "fs";
+import * as fs from "node:fs";
 import { Mutex } from "./mutex";
 import { ErApiError, ErBudgetExceededError, ErValidationError } from "./errors";
 import { validateResponse } from "./guards";

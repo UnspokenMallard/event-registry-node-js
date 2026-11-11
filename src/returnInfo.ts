@@ -1,5 +1,5 @@
 import { ER } from "./types";
-import * as fs from "fs";
+import * as fs from "node:fs";
 import { Logger } from "./logger";
 
 export abstract class ReturnInfoFlagsBase {

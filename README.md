@@ -6,6 +6,16 @@ Most of the package is quite similar to [Event Registry Python](https://github.c
 
 Node.js 24.11.0 is the supported development target. Starting with `10.0.0`, Node.js **18+ is a hard runtime requirement** (the HTTP layer uses native `fetch`); see [MIGRATION.md](MIGRATION.md) for details.
 
+### Supported runtimes
+
+| Runtime | Status |
+|---|---|
+| Node.js 18, 20, 22, 24 | Tested in CI (full suite; unit tests on 20+). |
+| Bun | The ESM build is imported and the client constructed in CI. |
+| Cloudflare Workers (workerd) | The ESM build is loaded in workerd through Miniflare in CI. Needs the `nodejs_compat` compatibility flag and a recent compatibility date (the CI check uses 2026-01-01; 2025-01-01 lacks `node:fs`), because the package imports `node:fs` for optional `settings.json` and log files. File access is skipped when the files do not exist. |
+
+Deno and browsers are not tested. The package has no runtime dependencies and needs a global `fetch`.
+
 API reference (generated with TypeDoc from the strict build): https://eventregistry.github.io/event-registry-node-js/ — run `npm run docs` to build it locally into `docs-site/`.
 
 Building an agent or an unattended pipeline? See [AGENT-RECIPES.md](AGENT-RECIPES.md) for the suggest, scan, triage, retrieve pattern plus budgets, cancellation and resumable feeds.
