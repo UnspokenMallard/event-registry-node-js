@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-shadow, @typescript-eslint/no-unused-vars */
 import { QueryItems } from "./base";
+import { ErApiError } from "./errors";
 import { BaseQuery, CombinedQuery} from "./query";
 import { QueryArticles, RequestArticles } from "./queryArticles";
 import { RequestEvents } from "./queryEvents";
@@ -24,6 +25,8 @@ export namespace ER {
 
     export interface ErrorResponse<E = string> {
         error?: E;
+        /** Set next to `error` when the API answered with an HTTP error status: status, API code, request id and token cost. */
+        apiError?: ErApiError;
     }
 
     export interface Results<T = unknown> {

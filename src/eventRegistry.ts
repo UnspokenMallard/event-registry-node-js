@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import { Mutex } from "./mutex";
-import { ErBudgetExceededError } from "./errors";
+import { ErApiError, ErBudgetExceededError } from "./errors";
 import { Usage } from "./usage";
 import { abortableSleep, composeSignal } from "./abort";
 import { erFetch, ErHttpResponse } from "./http";
@@ -326,7 +326,7 @@ export class EventRegistry {
     private createErrorResponse<T>(error: unknown): ErHttpResponse<T> {
         const message = error instanceof Error ? error.message : String(error);
         return {
-            data: { error: message } as T,
+            data: (error instanceof ErApiError ? { error: message, apiError: error } : { error: message }) as T,
             status: 0,
             statusText: "error",
             headers: new Headers()
