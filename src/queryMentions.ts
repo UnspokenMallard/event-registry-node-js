@@ -1,3 +1,4 @@
+import { isCancellation } from "./abort";
 import { Query, QueryParamsBase } from "./base";
 import { EventRegistry } from "./eventRegistry";
 import { ReturnInfo } from "./returnInfo";
@@ -172,6 +173,7 @@ export class QueryMentions extends Query<RequestMentions> {
 
 export class QueryMentionsIter extends QueryMentions implements AsyncIterable<Record<string, unknown>> {
     private readonly er: EventRegistry;
+    private readonly signal?: AbortSignal;
     private readonly sortBy: "date" | "socialScore" | "none" | "rel" | "size";
     private readonly sortByAsc: boolean;
     private readonly returnInfo: ReturnInfo | undefined;
@@ -193,7 +195,8 @@ export class QueryMentionsIter extends QueryMentions implements AsyncIterable<Re
             returnInfo = undefined,
             maxItems = -1
         } = args;
-        this.er = er;
+        this.er = args.signal || args.timeoutMs ? er.withOptions({ signal: args.signal, timeoutMs: args.timeoutMs }) : er;
+        this.signal = args.signal;
         this.sortBy = sortBy;
         this.sortByAsc = sortByAsc;
         this.returnInfo = returnInfo;
@@ -203,6 +206,7 @@ export class QueryMentionsIter extends QueryMentions implements AsyncIterable<Re
     [Symbol.asyncIterator](): AsyncIterator<Record<string, unknown>> {
         return {
             next: async () => {
+                this.signal?.throwIfAborted();
                 if (this.index >= this.items.length) {
                     await this.getNextBatch();
                 }
@@ -230,7 +234,7 @@ export class QueryMentionsIter extends QueryMentions implements AsyncIterable<Re
      public execQuery(callback: (item: Record<string, unknown>) => void, doneCallback?: (error?: string) => void) {
         if (callback) { this.callback = callback; }
         if (doneCallback) { this.doneCallback = doneCallback; }
-        void this.iterate(); // errors surface through doneCallback; the callback API returns no promise
+        this.iterate().catch((error: unknown) => this.doneCallback(error instanceof Error ? error.message : String(error)));
     }
 
     public static initWithComplexQuery(er: EventRegistry, complexQuery: string | Record<string, unknown>, args: ER.QueryMentions.IteratorArguments = {}) {
@@ -299,6 +303,9 @@ export class QueryMentionsIter extends QueryMentions implements AsyncIterable<Re
             this.items = [...this.items, ...results];
             return true;
         } catch (error) {
+            if (isCancellation(error, this.signal)) {
+                throw error;
+            }
             this.er.logger.error(error instanceof Error ? error.message : String(error));
             return false;
         }

@@ -9,7 +9,7 @@ export {
     ArticleMapper
 } from "./eventRegistry";
 export { sleep, mainLangs, allLangs } from "./base";
-export { ErApiError } from "./errors";
+export { ErApiError, ErTimeoutError } from "./errors";
 export { ER } from "./types";
 export {
     GetSourceInfo,

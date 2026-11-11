@@ -1,3 +1,4 @@
+import { abortReason, abortableSleep } from "./abort";
 import { ErApiError, parseRetryAfter } from "./errors";
 
 export interface ErHttpResponse<T = unknown> {
@@ -12,17 +13,16 @@ export interface ErHttpRequest {
     method?: string;
     body?: unknown;
     headers?: Record<string, string>;
+    /** Per-attempt timeout. For an overall deadline use `signal` (see `composeSignal`). */
     timeoutMs?: number;
+    /** Aborts the call: no further attempt starts and a pending backoff wait is cancelled. */
+    signal?: AbortSignal;
     retry?: number;
     /** Base of the backoff schedule: attempt n waits about `retryDelayMs * 2^n`, capped at `maxRetryDelayMs`. */
     retryDelayMs?: number;
     maxRetryDelayMs?: number;
     stopStatusCodes?: number[];
     responseType?: "json" | "text";
-}
-
-function sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** Exponential backoff with equal jitter; the fixed `retryDelayMs` is the base of the schedule. */
@@ -91,8 +91,11 @@ export async function erFetch<T = unknown>(req: ErHttpRequest): Promise<ErHttpRe
 
     let attempt = 0;
     for (;;) {
+        req.signal?.throwIfAborted();
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeoutMs);
+        const onAbort = () => controller.abort(req.signal?.reason);
+        req.signal?.addEventListener("abort", onAbort, { once: true });
         try {
             const init: RequestInit = {
                 method,
@@ -134,9 +137,13 @@ export async function erFetch<T = unknown>(req: ErHttpRequest): Promise<ErHttpRe
                 ? apiError.retryAfterMs
                 : backoffDelay(attempt, retryDelayMs, maxRetryDelayMs);
             attempt += 1;
-            await sleep(delay);
+            await abortableSleep(delay, req.signal);
         } catch (error) {
             clearTimeout(timer);
+            if (req.signal?.aborted) {
+                // the caller cancelled: never retry
+                throw abortReason(req.signal);
+            }
             const status = (error as { response?: { status?: number } })?.response?.status;
             if (status !== undefined && stopStatusCodes.includes(status)) {
                 throw error;
@@ -151,7 +158,9 @@ export async function erFetch<T = unknown>(req: ErHttpRequest): Promise<ErHttpRe
             }
             const delay = backoffDelay(attempt, retryDelayMs, maxRetryDelayMs);
             attempt += 1;
-            await sleep(delay);
+            await abortableSleep(delay, req.signal);
+        } finally {
+            req.signal?.removeEventListener("abort", onAbort);
         }
     }
 }

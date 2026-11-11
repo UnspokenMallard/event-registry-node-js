@@ -52,7 +52,7 @@ export class QueryArticles extends Query<RequestArticles> {
             ...unsupported
         } = args;
         if (Object.keys(unsupported).length > 0) {
-            const unsupportedKeys = ["sortBy", "sortByAsc", "returnInfo", "maxItems"];
+            const unsupportedKeys = ["sortBy", "sortByAsc", "returnInfo", "maxItems", "signal", "timeoutMs"];
             if (!Object.keys(unsupported).some(key => unsupportedKeys.includes(key))) {
                 console.warn(`QueryArticles: Unsupported parameters detected: ${JSON.stringify(unsupported)}. Please check the documentation.`);
             }
@@ -195,9 +195,10 @@ export class QueryArticlesIter extends QueryArticles implements AsyncIterable<Da
             returnInfo = undefined,
             maxItems = -1
         } = args;
-        this.er = er;
+        this.er = args.signal || args.timeoutMs ? er.withOptions({ signal: args.signal, timeoutMs: args.timeoutMs }) : er;
         this.engine = new QueryIterationEngine<Data.Article>({
             maxItems,
+            signal: args.signal,
             entityLabel: "articles",
             onError: (message) => this.er.logger.error(message),
             fetchPage: async (page) => {

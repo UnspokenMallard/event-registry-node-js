@@ -51,3 +51,14 @@ export function parseRetryAfter(value: string | null, now: number = Date.now()):
     const date = Date.parse(value);
     return Number.isNaN(date) ? undefined : Math.max(0, date - now);
 }
+
+/** Thrown when the overall `timeoutMs` of a call (queueing, retries and backoff included) runs out. */
+export class ErTimeoutError extends Error {
+    public readonly timeoutMs: number;
+
+    constructor(timeoutMs: number) {
+        super(`Request timed out after ${timeoutMs} ms`);
+        this.name = "ErTimeoutError";
+        this.timeoutMs = timeoutMs;
+    }
+}

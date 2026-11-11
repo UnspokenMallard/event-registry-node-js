@@ -1,3 +1,4 @@
+import { isCancellation } from "./abort";
 import { Query, QueryParamsBase } from "./base";
 import { Data } from "./data";
 import { EventRegistry } from "./eventRegistry";
@@ -39,6 +40,7 @@ export class QueryEvent extends Query<RequestEvent> {
  */
 export class QueryEventArticlesIter extends QueryEvent implements AsyncIterable<Data.Article> {
     private readonly er: EventRegistry;
+    private readonly signal?: AbortSignal;
     private readonly sortBy: ER.QueryEvent.SortByOptions;
     private readonly sortByAsc: boolean;
     private readonly returnInfo: ReturnInfo | undefined;
@@ -85,7 +87,8 @@ export class QueryEventArticlesIter extends QueryEvent implements AsyncIterable<
             minSentiment = -1,
             maxSentiment = 1
         } = args;
-        this.er = er;
+        this.er = args.signal || args.timeoutMs ? er.withOptions({ signal: args.signal, timeoutMs: args.timeoutMs }) : er;
+        this.signal = args.signal;
         this.sortBy = sortBy;
         this.sortByAsc = sortByAsc;
         this.returnInfo = returnInfo;
@@ -153,6 +156,7 @@ export class QueryEventArticlesIter extends QueryEvent implements AsyncIterable<
     [Symbol.asyncIterator](): AsyncIterator<Data.Article> {
         return {
             next: async () => {
+                this.signal?.throwIfAborted();
                 if (this.index >= this.items.length) {
                     await this.getNextBatch();
                 }
@@ -179,7 +183,7 @@ export class QueryEventArticlesIter extends QueryEvent implements AsyncIterable<
     public execQuery(callback: (item: Data.Article) => void, doneCallback?: (error?: string) => void): void {
         if (callback) { this.callback = callback; }
         if (doneCallback) { this.doneCallback = doneCallback; }
-        void this.iterate(); // errors surface through doneCallback; the callback API returns no promise
+        this.iterate().catch((error: unknown) => this.doneCallback(error instanceof Error ? error.message : String(error)));
     }
 
     private async iterate(): Promise<void> {
@@ -236,6 +240,9 @@ export class QueryEventArticlesIter extends QueryEvent implements AsyncIterable<
             this.items = [...this.items, ...results];
             return true;
         } catch (error) {
+            if (isCancellation(error, this.signal)) {
+                throw error;
+            }
             this.er.logger.error(error instanceof Error ? error.message : String(error));
             return false;
         }

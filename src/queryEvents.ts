@@ -198,9 +198,10 @@ export class QueryEventsIter extends QueryEvents implements AsyncIterable<Data.E
             returnInfo = undefined,
             maxItems = -1
         } = args;
-        this.er = er;
+        this.er = args.signal || args.timeoutMs ? er.withOptions({ signal: args.signal, timeoutMs: args.timeoutMs }) : er;
         this.engine = new QueryIterationEngine<Data.Event>({
             maxItems,
+            signal: args.signal,
             entityLabel: "events",
             onError: (message) => this.er.logger.error(message),
             fetchPage: async (page) => {

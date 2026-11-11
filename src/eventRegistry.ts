@@ -1,9 +1,10 @@
 import * as fs from "fs";
 import { Mutex } from "./mutex";
+import { abortableSleep, composeSignal } from "./abort";
 import { erFetch, ErHttpResponse } from "./http";
 import { ConceptInfoFlags, ReturnInfo } from "./returnInfo";
 import { ER } from "./types";
-import { QueryParamsBase, sleep } from "./base";
+import { QueryParamsBase } from "./base";
 import { QueryArticle } from "./queryArticle";
 import { QueryArticles } from "./queryArticles";
 import { QueryEvents } from "./queryEvents";
@@ -53,56 +54,56 @@ function firstMatchField<T, K extends keyof T>(matches: T[] | undefined, field: 
 export class EventRegistry {
     public logger: Logger;
     /** Ergonomic article search/iterate/get façade — see `ArticlesFluent`. */
-    public readonly articles: ArticlesFluent;
+    public readonly articles!: ArticlesFluent;
     /** Ergonomic event search/iterate/get façade — see `EventsFluent`. */
-    public readonly events: EventsFluent;
+    public readonly events!: EventsFluent;
     /** Ergonomic mentions search/iterate façade — see `MentionsFluent`. */
-    public readonly mentions: MentionsFluent;
+    public readonly mentions!: MentionsFluent;
     /** Ergonomic story lookup façade — see `StoriesFluent`. */
-    public readonly stories: StoriesFluent;
+    public readonly stories!: StoriesFluent;
     /** Ergonomic trending concepts/categories façade — see `TrendsFluent`. */
-    public readonly trends: TrendsFluent;
+    public readonly trends!: TrendsFluent;
     /** Ergonomic concept/category mention-count façade — see `CountsFluent`. */
-    public readonly counts: CountsFluent;
+    public readonly counts!: CountsFluent;
     /** Ergonomic top-shared articles/events façade — see `SharesFluent`. */
-    public readonly shares: SharesFluent;
+    public readonly shares!: SharesFluent;
     /** Ergonomic recent activity façade — see `RecentFluent`. */
-    public readonly recent: RecentFluent;
+    public readonly recent!: RecentFluent;
     /** Ergonomic source/concept/category info façade — see `InfoFluent`. */
-    public readonly info: InfoFluent;
+    public readonly info!: InfoFluent;
     /** Ergonomic topic page listing/loading/building façade — see `TopicPagesFluent`. */
-    public readonly topicPages: TopicPagesFluent;
+    public readonly topicPages!: TopicPagesFluent;
     /** Ergonomic text analytics façade — see `AnalyticsFluent`. */
-    public readonly analytics: AnalyticsFluent;
+    public readonly analytics!: AnalyticsFluent;
     /** Ergonomic callable form of `GetEventForText.compute()`. */
-    public readonly eventForText: EventForTextFluent;
+    public readonly eventForText!: EventForTextFluent;
     /** Ergonomic concept uri resolution — see `helpers/uri.conceptUri`. */
-    public readonly concepts: {
+    public readonly concepts!: {
         uri: (label: string, args?: ER.GetConceptUriArguments) => Promise<string>;
     };
     /** Ergonomic category uri resolution — see `helpers/uri.categoryUri`. */
-    public readonly categories: {
+    public readonly categories!: {
         uri: (label: string) => Promise<string>;
     };
     /** Ergonomic news source/source group uri resolution — see `helpers/uri.sourceUri`. */
-    public readonly sources: {
+    public readonly sources!: {
         uri: (label: string, dataType?: ER.DataType[] | ER.DataType) => Promise<string>;
         groupUri: (label: string) => Promise<string>;
     };
     /** Ergonomic location uri resolution — see `helpers/uri.locationUri`. */
-    public readonly locations: {
+    public readonly locations!: {
         uri: (label: string, args?: ER.GetLocationUriArguments) => Promise<string>;
     };
     /** Ergonomic event type uri resolution — see `helpers/uri.eventTypeUri`. */
-    public readonly eventTypes: {
+    public readonly eventTypes!: {
         uri: (label: string) => Promise<string>;
     };
     /** Ergonomic concept class uri resolution — see `helpers/uri.conceptClassUri`. */
-    public readonly conceptClasses: {
+    public readonly conceptClasses!: {
         uri: (label: string, lang?: string) => Promise<string>;
     };
     /** Ergonomic author uri resolution — see `helpers/uri.authorUri`. */
-    public readonly authors: {
+    public readonly authors!: {
         uri: (label: string) => Promise<string>;
     };
     private config: ER.Config = {
@@ -156,40 +157,74 @@ export class EventRegistry {
         this.logger.debug(`Text analytics host: ${this.config.hostAnalytics}`);
         this.config.minDelayBetweenRequests = (this.config.minDelayBetweenRequests ?? 0.5) * 1000;
 
-        this.articles = new ArticlesFluent(this);
-        this.events = new EventsFluent(this);
-        this.mentions = new MentionsFluent(this);
-        this.stories = new StoriesFluent(this);
-        this.trends = new TrendsFluent(this);
-        this.counts = new CountsFluent(this);
-        this.shares = new SharesFluent(this);
-        this.recent = new RecentFluent(this);
-        this.info = new InfoFluent(this);
-        this.topicPages = new TopicPagesFluent(this);
-        this.analytics = new AnalyticsFluent(this);
-        this.eventForText = createEventForTextFluent(this);
-        this.concepts = {
-            uri: (label: string, args?: ER.GetConceptUriArguments) => resolveConceptUri(this, label, args)
+        Object.assign(this, this.buildNamespaces(this));
+    }
+
+    /** Namespaces (`er.articles`, `er.concepts`, …) bound to `self`, so a `withOptions` view routes through itself. */
+    private buildNamespaces(self: EventRegistry) {
+        return {
+            articles: new ArticlesFluent(self),
+            events: new EventsFluent(self),
+            mentions: new MentionsFluent(self),
+            stories: new StoriesFluent(self),
+            trends: new TrendsFluent(self),
+            counts: new CountsFluent(self),
+            shares: new SharesFluent(self),
+            recent: new RecentFluent(self),
+            info: new InfoFluent(self),
+            topicPages: new TopicPagesFluent(self),
+            analytics: new AnalyticsFluent(self),
+            eventForText: createEventForTextFluent(self),
+            concepts: {
+                uri: (label: string, args?: ER.GetConceptUriArguments) => resolveConceptUri(self, label, args)
+            },
+            categories: {
+                uri: (label: string) => resolveCategoryUri(self, label)
+            },
+            sources: {
+                uri: (label: string, dataType?: ER.DataType[] | ER.DataType) => resolveSourceUri(self, label, dataType),
+                groupUri: (label: string) => resolveSourceGroupUri(self, label)
+            },
+            locations: {
+                uri: (label: string, args?: ER.GetLocationUriArguments) => resolveLocationUri(self, label, args)
+            },
+            eventTypes: {
+                uri: (label: string) => resolveEventTypeUri(self, label)
+            },
+            conceptClasses: {
+                uri: (label: string, lang?: string) => resolveConceptClassUri(self, label, lang)
+            },
+            authors: {
+                uri: (label: string) => resolveAuthorUri(self, label)
+            }
         };
-        this.categories = {
-            uri: (label: string) => resolveCategoryUri(this, label)
+    }
+
+    /** Signals and deadline applied to every call made through this instance (or `withOptions` view). */
+    private get requestScope(): { signals: AbortSignal[]; timeoutMs?: number } {
+        return { signals: this.config.signal ? [this.config.signal] : [], timeoutMs: this.config.timeoutMs };
+    }
+
+    /**
+     * Return a view of this client whose every call (classic, helpers, fluent namespaces and iterators)
+     * also observes `options.signal` and `options.timeoutMs`. State (rate limit, usage, headers, queue)
+     * is shared with this instance. A view's signal adds to, and its `timeoutMs` replaces, the inherited ones.
+     */
+    public withOptions(options: ER.RequestOptions): EventRegistry {
+        const scope = this.requestScope;
+        const overrides: Record<string | symbol, unknown> = {
+            requestScope: {
+                signals: options.signal ? [...scope.signals, options.signal] : scope.signals,
+                timeoutMs: options.timeoutMs ?? scope.timeoutMs
+            }
         };
-        this.sources = {
-            uri: (label: string, dataType?: ER.DataType[] | ER.DataType) => resolveSourceUri(this, label, dataType),
-            groupUri: (label: string) => resolveSourceGroupUri(this, label)
-        };
-        this.locations = {
-            uri: (label: string, args?: ER.GetLocationUriArguments) => resolveLocationUri(this, label, args)
-        };
-        this.eventTypes = {
-            uri: (label: string) => resolveEventTypeUri(this, label)
-        };
-        this.conceptClasses = {
-            uri: (label: string, lang?: string) => resolveConceptClassUri(this, label, lang)
-        };
-        this.authors = {
-            uri: (label: string) => resolveAuthorUri(this, label)
-        };
+        const view: EventRegistry = new Proxy(this, {
+            get: (target, prop, receiver) => prop in overrides ? overrides[prop] : Reflect.get(target, prop, receiver) as unknown,
+            // writes (rate-limit bookkeeping, headers, ...) land on the shared root instance
+            set: (target, prop, value) => Reflect.set(target, prop, value)
+        });
+        Object.assign(overrides, this.buildNamespaces(view));
+        return view;
     }
 
     public getHost(): string {
@@ -310,36 +345,54 @@ export class EventRegistry {
     /**
      * Main method for executing the search queries.
      * @param query instance of Query class
+     * @param options `signal` / `timeoutMs` for this call only
      */
     public async execQuery<T = ER.SuccessfulResponse<unknown>>(
         query: { path: string; getQueryParams: () => Record<string, unknown> },
-        allowUseOfArchive: boolean = this.config.allowUseOfArchive ?? true
+        allowUseOfArchive: boolean = this.config.allowUseOfArchive ?? true,
+        options?: ER.RequestOptions
     ): Promise<ER.Response<T>> {
         const params = query.getQueryParams();
-        const request = await this.jsonRequest<ER.Response<T>>(query.path, params, allowUseOfArchive);
+        const request = await this.jsonRequest<ER.Response<T>>(query.path, params, allowUseOfArchive, options);
         if (!request?.data && this.config?.verboseOutput) {
             this.logger.error("Request did not return with the 'data' property.");
         }
         return (request?.data || {} as ER.Response<T>);
     }
 
+    /** Merge instance/view defaults with per-call options into one signal (caller must `dispose()`). */
+    private composeCallScope(options?: ER.RequestOptions): { signal?: AbortSignal; dispose: () => void } {
+        const scope = this.requestScope;
+        return composeSignal([...scope.signals, options?.signal], options?.timeoutMs ?? scope.timeoutMs);
+    }
+
+    private async acquireLock(scope: { signal?: AbortSignal; dispose: () => void }): Promise<void> {
+        try {
+            await this.lock.acquire(scope.signal);
+        } catch (error) {
+            scope.dispose();
+            throw error;
+        }
+    }
+
     /**
      * Wait until minDelayBetweenRequests has elapsed since the last attempt.
      * Must run while holding `this.lock`.
      */
-    private async waitForTurn(): Promise<void> {
+    private async waitForTurn(signal?: AbortSignal): Promise<void> {
         const now = Date.now();
         const minDelayBetweenRequests = this.config.minDelayBetweenRequests ?? 500;
         if (this.lastQueryTime && now - this.lastQueryTime < minDelayBetweenRequests) {
-            await sleep(minDelayBetweenRequests - (now - this.lastQueryTime));
+            await abortableSleep(minDelayBetweenRequests - (now - this.lastQueryTime), signal);
         }
     }
 
-    public async jsonRequestAnalytics<T = unknown>(path: string, parameters?: Record<string, unknown>, headers?: Record<string, unknown>, cookies?: Record<string, unknown>): Promise<ErHttpResponse<T>> {
+    public async jsonRequestAnalytics<T = unknown>(path: string, parameters?: Record<string, unknown>, headers?: Record<string, unknown>, cookies?: Record<string, unknown>, options?: ER.RequestOptions): Promise<ErHttpResponse<T>> {
         let request: ErHttpResponse<T>;
-        await this.lock.acquire();
+        const scope = this.composeCallScope(options);
+        await this.acquireLock(scope);
         try {
-            await this.waitForTurn();
+            await this.waitForTurn(scope.signal);
             parameters = {
                 ...parameters,
                 ...(this.extraParams || {}),
@@ -359,6 +412,7 @@ export class EventRegistry {
                     method: "POST",
                     body: parameters,
                     headers: requestHeaders,
+                    signal: scope.signal,
                     timeoutMs: 600_000,
                     retry: this.config.repeatFailedRequestCount,
                     retryDelayMs: 5000,
@@ -376,6 +430,9 @@ export class EventRegistry {
                 throw new Error(errorMessage);
             }
         } catch (error: unknown) {
+            if (scope.signal?.aborted) {
+                throw scope.signal.reason;
+            }
             request = this.createErrorResponse<T>(error);
             const err = error as { stack?: string; message?: string; response?: { status?: number; statusText?: string; data?: unknown }; errno?: unknown };
             if (this.config.verboseOutput) {
@@ -392,6 +449,7 @@ export class EventRegistry {
             }
         } finally {
             this.lock.release();
+            scope.dispose();
         }
         return request;
     }
@@ -401,11 +459,12 @@ export class EventRegistry {
      * @param path url on er (e.g. "/api/v1/article")
      * @param parameters Optional parameters to be included in the request
      */
-    public async jsonRequest<T = unknown>(path: string, parameters?: Record<string, unknown>, allowUseOfArchive: boolean = this.config.allowUseOfArchive ?? true): Promise<ErHttpResponse<T>> {
+    public async jsonRequest<T = unknown>(path: string, parameters?: Record<string, unknown>, allowUseOfArchive: boolean = this.config.allowUseOfArchive ?? true, options?: ER.RequestOptions): Promise<ErHttpResponse<T>> {
         let request: ErHttpResponse<T>;
-        await this.lock.acquire();
+        const scope = this.composeCallScope(options);
+        await this.acquireLock(scope);
         try {
-            await this.waitForTurn();
+            await this.waitForTurn(scope.signal);
             if (this._logRequests) {
                 if (Object.keys(parameters || {}).length > 0) {
                     this.logger.logRequest("# " + JSON.stringify(parameters) + "\n");
@@ -425,6 +484,7 @@ export class EventRegistry {
                     url: `${this.config.host}${path}`,
                     method: "POST",
                     body: parameters,
+                    signal: scope.signal,
                     timeoutMs: 600_000,
                     retry: this.config.repeatFailedRequestCount,
                     retryDelayMs: 5000,
@@ -447,6 +507,9 @@ export class EventRegistry {
                 throw new Error(errorMessage);
             }
         } catch (error: unknown) {
+            if (scope.signal?.aborted) {
+                throw scope.signal.reason;
+            }
             request = this.createErrorResponse<T>(error);
             const err = error as { stack?: string; message?: string; response?: { status?: number; statusText?: string; data?: unknown }; errno?: unknown };
             // try to print out the error that should be passed by in case the server is down or responds with errors
@@ -463,6 +526,7 @@ export class EventRegistry {
             }
         } finally {
             this.lock.release();
+            scope.dispose();
         }
         return request;
     }

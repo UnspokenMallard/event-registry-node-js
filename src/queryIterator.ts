@@ -1,3 +1,5 @@
+import { isCancellation } from "./abort";
+
 /**
  * Shared pagination engine backing QueryArticlesIter and QueryEventsIter.
  * Each caller supplies a `fetchPage` closure that knows how to build/execute
@@ -11,6 +13,8 @@ export interface PageFetchResult<TItem> {
 }
 
 export interface QueryIterationEngineOptions<TItem> {
+    /** Caller's abort signal: once aborted no further page is requested and iteration rejects. */
+    signal?: AbortSignal;
     maxItems: number;
     entityLabel: string;
     fetchPage: (page: number) => Promise<PageFetchResult<TItem>>;
@@ -32,6 +36,7 @@ export class QueryIterationEngine<TItem> implements AsyncIterable<TItem> {
     public [Symbol.asyncIterator](): AsyncIterator<TItem> {
         return {
             next: async () => {
+                this.options.signal?.throwIfAborted();
                 if (this.index >= this.items.length) {
                     await this.getNextBatch();
                 }
@@ -45,7 +50,7 @@ export class QueryIterationEngine<TItem> implements AsyncIterable<TItem> {
     public execQuery(callback: (item: TItem) => void, doneCallback?: (error?: string) => void): void {
         if (callback) { this.callback = callback; }
         if (doneCallback) { this.doneCallback = doneCallback; }
-        void this.iterate(); // errors surface through doneCallback; the callback API returns no promise
+        this.iterate().catch((error: unknown) => this.doneCallback(error instanceof Error ? error.message : String(error)));
     }
 
     private get current(): TItem | undefined {
@@ -82,6 +87,9 @@ export class QueryIterationEngine<TItem> implements AsyncIterable<TItem> {
             this.items = [...this.items, ...extracted];
             return true;
         } catch (err) {
+            if (isCancellation(err, this.options.signal)) {
+                throw err;
+            }
             onError(err instanceof Error ? err.message : String(err));
             return false;
         }

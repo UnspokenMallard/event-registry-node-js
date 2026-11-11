@@ -45,7 +45,18 @@ export namespace ER {
         [name: string]: any;
     }
 
-    export interface Config {
+    /** Per-call cancellation and deadline, accepted wherever a request is made. */
+    export interface RequestOptions {
+        /** Aborts the call: waiting in the queue, the HTTP request and backoff waits all stop. */
+        signal?: AbortSignal;
+        /**
+         * Overall deadline in milliseconds for the call, queueing, retries and backoff waits included.
+         * Exceeding it rejects with `ErTimeoutError`.
+         */
+        timeoutMs?: number;
+    }
+
+    export interface Config extends RequestOptions {
         /**
          * API key that should be used to make the requests to the Event Registry.
          * API key is assigned to each user account and can be obtained on this page:
@@ -1286,7 +1297,7 @@ export namespace ER {
              */
             requestedResult?: RequestArticles;
         }
-        export interface IteratorArguments extends Arguments {
+        export interface IteratorArguments extends Arguments, RequestOptions {
             /**
              * how should the resulting articles be sorted. Options: "rel" (relevance), "date" (published date), "sourceImportance", "sourceImportanceRank", "sourceAlexaGlobalRank", "sourceAlexaCountryRank", "socialScore", "facebookShares"
              */
@@ -1323,7 +1334,7 @@ export namespace ER {
         export type SortByOptions = "id" | "date" | "cosSim" | "sourceImportance" | "sourceImportanceRank" | "sourceAlexaGlobalRank" | "sourceAlexaCountryRank" | "socialScore" | "facebookShares";
 
         export type RequestEvent = Record<string, never>;
-        export interface IteratorArguments {
+        export interface IteratorArguments extends RequestOptions {
             /**
              * Array or a single language in which to return the list of matching articles
              */
@@ -1544,7 +1555,7 @@ export namespace ER {
             maxSentenceIndex?: number;
             requestedResult?: RequestMentions;
         }
-        export interface IteratorArguments extends Arguments {
+        export interface IteratorArguments extends Arguments, RequestOptions {
             /**
              * how should the resulting mentions be sorted. Options: "none", "rel" (relevance), "date" (published date), "size", "socialScore"
              */
@@ -1862,7 +1873,7 @@ export namespace ER {
              */
             requestedResult?: RequestEvents;
         }
-        export interface IteratorArguments extends Arguments {
+        export interface IteratorArguments extends Arguments, RequestOptions {
             /**
              * how should the resulting events be sorted. Options:
              *  - none (no specific sorting),
