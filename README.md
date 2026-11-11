@@ -6,6 +6,8 @@ Most of the package is quite similar to [Event Registry Python](https://github.c
 
 Node.js 24.11.0 is the supported development target. Starting with `10.0.0`, Node.js **18+ is a hard runtime requirement** (the HTTP layer uses native `fetch`); see [MIGRATION.md](MIGRATION.md) for details.
 
+API reference (generated with TypeDoc from the strict build): https://eventregistry.github.io/event-registry-node-js/ — run `npm run docs` to build it locally into `docs-site/`.
+
 ### Installation
 
 Event Registry package can be installed using the NodeJS Package Manager. Type the following in the command line:

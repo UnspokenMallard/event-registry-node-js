@@ -1,0 +1,20 @@
+{
+    "$schema": "https://typedoc.org/schema.json",
+    "entryPoints": [
+        "src/index.ts"
+    ],
+    "tsconfig": "tsconfig.cjs.json",
+    "out": "docs-site",
+    "name": "eventregistry",
+    "readme": "README.md",
+    "includeVersion": true,
+    "githubPages": true,
+    "excludePrivate": true,
+    "excludeInternal": true,
+    "validation": {
+        "notExported": false,
+        "invalidLink": true
+    },
+    "gitRevision": "master",
+    "sourceLinkTemplate": "https://github.com/EventRegistry/event-registry-node-js/blob/{gitRevision}/{path}#L{line}"
+}

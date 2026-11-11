@@ -40,6 +40,7 @@
     "lint": "eslint \"src/**/*.ts\"",
     "example:check": "tsc --noEmit -p examples/tsconfig.json",
     "example": "tsx --tsconfig examples/tsconfig.json",
+    "docs": "typedoc",
     "pretest": "tsc --project ./test/tsconfig.json",
     "test": "jasmine --config=./test/jasmine.json",
     "test:live": "node scripts/run-tests-with-mode.js live",
@@ -59,6 +60,7 @@
     "jasmine": "5.12.0",
     "publint": "^0.3.25",
     "tsx": "4.23.15",
+    "typedoc": "0.28.20",
     "typescript": "5.8.3",
     "typescript-eslint": "^8.72.2",
     "vitest": "^5.1.0"
