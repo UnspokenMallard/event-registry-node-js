@@ -62,3 +62,26 @@ export class ErTimeoutError extends Error {
         this.timeoutMs = timeoutMs;
     }
 }
+
+/**
+ * Thrown before a request is sent when the `maxTokens` budget would be exceeded.
+ * The check uses the token cost the API reported for earlier calls (see `Usage`), so it is an estimate.
+ */
+export class ErBudgetExceededError extends Error {
+    public readonly maxTokens: number;
+    /** Tokens spent by this client since construction or the last `usage.reset()`. */
+    public readonly spentTokens: number;
+    /** Estimated cost of the refused call (the last reported cost of the same path, 0 when unknown). */
+    public readonly estimatedTokens: number;
+    public readonly path: string;
+
+    constructor(details: { maxTokens: number; spentTokens: number; estimatedTokens: number; path: string }) {
+        super(`Token budget of ${details.maxTokens} would be exceeded by ${details.path}: ${details.spentTokens} spent, about ${details.estimatedTokens} needed`);
+        this.name = "ErBudgetExceededError";
+        this.maxTokens = details.maxTokens;
+        this.spentTokens = details.spentTokens;
+        this.estimatedTokens = details.estimatedTokens;
+        this.path = details.path;
+        Object.setPrototypeOf(this, new.target.prototype);
+    }
+}

@@ -1,4 +1,4 @@
-import { ErTimeoutError } from "./errors";
+import { ErBudgetExceededError, ErTimeoutError } from "./errors";
 
 /**
  * Combine an optional caller signal with an optional overall deadline into one signal.
@@ -64,7 +64,7 @@ export function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> 
     });
 }
 
-/** True when an error means the caller cancelled or ran out of time, so it must propagate instead of being logged away. */
+/** True when an error means the caller cancelled, ran out of time or out of budget, so it must propagate instead of being logged away. */
 export function isCancellation(error: unknown, signal?: AbortSignal): boolean {
-    return signal?.aborted === true || error instanceof ErTimeoutError;
+    return signal?.aborted === true || error instanceof ErTimeoutError || error instanceof ErBudgetExceededError;
 }

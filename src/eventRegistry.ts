@@ -1,5 +1,7 @@
 import * as fs from "fs";
 import { Mutex } from "./mutex";
+import { ErBudgetExceededError } from "./errors";
+import { Usage } from "./usage";
 import { abortableSleep, composeSignal } from "./abort";
 import { erFetch, ErHttpResponse } from "./http";
 import { ConceptInfoFlags, ReturnInfo } from "./returnInfo";
@@ -51,6 +53,8 @@ function firstMatchField<T, K extends keyof T>(matches: T[] | undefined, field: 
  * @class EventRegistry
  * Main class responsible for obtaining results form the Event Registry
  */
+const USAGE_PATH = "/api/v1/usage";
+
 export class EventRegistry {
     public logger: Logger;
     /** Ergonomic article search/iterate/get façade — see `ArticlesFluent`. */
@@ -115,6 +119,8 @@ export class EventRegistry {
         verboseOutput: false,
         allowUseOfArchive: true
     };
+    /** Token and request accounting plus the optional `maxTokens` budget guard. */
+    public readonly usage: Usage;
     private headers = new Headers();
     private dailyAvailableRequests = -1;
     private remainingAvailableRequests = -1;
@@ -141,6 +147,7 @@ export class EventRegistry {
             apiKey: config.apiKey !== undefined ? config.apiKey : fileSettings.apiKey
         };
 
+        this.usage = new Usage(this.config.maxTokens);
         this._logRequests = this.config.logging ?? false;
         this.logger = new Logger({ logging: this.config.logging, logRequests: this._logRequests });
 
@@ -393,6 +400,7 @@ export class EventRegistry {
         await this.acquireLock(scope);
         try {
             await this.waitForTurn(scope.signal);
+            this.usage.assertWithinBudget(path);
             parameters = {
                 ...parameters,
                 ...(this.extraParams || {}),
@@ -422,6 +430,7 @@ export class EventRegistry {
                 this.lastQueryTime = Date.now();
             }
             this.headers = request.headers;
+            this.usage.record(path, request.headers);
             if (request?.status !== 200) {
                 throw new Error(request?.statusText);
             }
@@ -430,6 +439,9 @@ export class EventRegistry {
                 throw new Error(errorMessage);
             }
         } catch (error: unknown) {
+            if (error instanceof ErBudgetExceededError) {
+                throw error;
+            }
             if (scope.signal?.aborted) {
                 throw scope.signal.reason;
             }
@@ -465,6 +477,9 @@ export class EventRegistry {
         await this.acquireLock(scope);
         try {
             await this.waitForTurn(scope.signal);
+            if (path !== USAGE_PATH) {
+                this.usage.assertWithinBudget(path);
+            }
             if (this._logRequests) {
                 if (Object.keys(parameters || {}).length > 0) {
                     this.logger.logRequest("# " + JSON.stringify(parameters) + "\n");
@@ -494,6 +509,7 @@ export class EventRegistry {
                 this.lastQueryTime = Date.now();
             }
             this.headers = request.headers;
+            this.usage.record(path, request.headers);
             if (request?.status !== 200) {
                 throw new Error(request?.statusText);
             }
@@ -507,6 +523,9 @@ export class EventRegistry {
                 throw new Error(errorMessage);
             }
         } catch (error: unknown) {
+            if (error instanceof ErBudgetExceededError) {
+                throw error;
+            }
             if (scope.signal?.aborted) {
                 throw scope.signal.reason;
             }
@@ -578,9 +597,18 @@ export class EventRegistry {
     /**
      * Return the number of used and total available tokens. Can be used at any time (also before making queries)
      */
-    public async getUsageInfo(): Promise<ER.UsageInfo> {
-        const request = await this.jsonRequest("/api/v1/usage");
+    public async getUsageInfo(options?: ER.RequestOptions): Promise<ER.UsageInfo> {
+        const request = await this.jsonRequest(USAGE_PATH, undefined, undefined, options);
         return request.data as ER.UsageInfo;
+    }
+
+    /**
+     * Tokens still available on the account (`availableTokens - usedTokens` from the usage endpoint).
+     * Makes one request; it is exempt from the `maxTokens` guard.
+     */
+    public async getRemainingTokens(options?: ER.RequestOptions): Promise<number> {
+        const info = await this.getUsageInfo(options);
+        return info.availableTokens - info.usedTokens;
     }
 
     public async getServiceStatus(): Promise<ER.UsageInfo> {

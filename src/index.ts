@@ -9,7 +9,9 @@ export {
     ArticleMapper
 } from "./eventRegistry";
 export { sleep, mainLangs, allLangs } from "./base";
-export { ErApiError, ErTimeoutError } from "./errors";
+export { ErApiError, ErBudgetExceededError, ErTimeoutError } from "./errors";
+export { Usage } from "./usage";
+export type { LastCallUsage } from "./usage";
 export { ER } from "./types";
 export {
     GetSourceInfo,

@@ -58,6 +58,12 @@ export namespace ER {
 
     export interface Config extends RequestOptions {
         /**
+         * Token budget for this client. Once the tokens reported by the API since construction (or `usage.reset()`)
+         * plus the last reported cost of the same endpoint would exceed it, calls throw `ErBudgetExceededError`
+         * before any request is sent. The cost of a call is only known afterwards, so the guard can overshoot by one call.
+         */
+        maxTokens?: number;
+        /**
          * API key that should be used to make the requests to the Event Registry.
          * API key is assigned to each user account and can be obtained on this page:
          * http://eventregistry.org/me?tab=settings
