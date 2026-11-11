@@ -106,6 +106,7 @@ export {
     GetRecentEvents,
     GetRecentArticles
 } from "./recent";
+export type { RecentCursor } from "./recent";
 export {
     ReturnInfo,
     ArticleInfoFlags,
@@ -158,6 +159,8 @@ export {
 export { getCounts, getCountsEx } from "./helpers/counts";
 export { getTopSharedArticles, getTopSharedEvents } from "./helpers/shares";
 export { getRecentEvents, getRecentArticles } from "./helpers/recent";
+export { RecentFeed, recentArticlesFeed, recentEventsFeed } from "./recentFeed";
+export type { RecentFeedOptions } from "./recentFeed";
 export {
     getSourceInfo,
     getConceptInfo,
