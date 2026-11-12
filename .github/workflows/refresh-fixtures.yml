@@ -37,7 +37,8 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Write settings.json
-        run: node -e 'require("fs").writeFileSync("settings.json", JSON.stringify({ apiKey: process.env.ER_API_KEY }))'
+        run: |
+          node -e 'require("fs").writeFileSync("settings.json", JSON.stringify({ apiKey: process.env.ER_API_KEY }))'
       - name: Record fixtures
         id: record
         run: npm run test:record
