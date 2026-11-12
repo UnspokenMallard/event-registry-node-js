@@ -20,6 +20,8 @@ concurrency:
 
 jobs:
   build:
+    # Forks do not have GitHub Pages enabled, so configure-pages fails there.
+    if: github.repository == 'EventRegistry/event-registry-node-js'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -35,6 +37,8 @@ jobs:
           path: docs-site
 
   deploy:
+    # Same guard as build; deploy would be skipped through needs anyway.
+    if: github.repository == 'EventRegistry/event-registry-node-js'
     needs: build
     runs-on: ubuntu-latest
     permissions:

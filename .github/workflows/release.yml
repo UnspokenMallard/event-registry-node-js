@@ -23,6 +23,8 @@ jobs:
       contents: read
 
   publish:
+    # Forks have no npm trusted-publishing grant, so publishing there always fails.
+    if: github.repository == 'EventRegistry/event-registry-node-js'
     needs: ci
     runs-on: ubuntu-latest
     permissions:
