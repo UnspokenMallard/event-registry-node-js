@@ -25,6 +25,9 @@ export interface ErHttpRequest {
     responseType?: "json" | "text";
 }
 
+/** Largest delay `setTimeout` accepts; anything bigger overflows and fires after about 1 ms. */
+const MAX_TIMER_MS = 2 ** 31 - 1;
+
 /** Exponential backoff with equal jitter; the fixed `retryDelayMs` is the base of the schedule. */
 function backoffDelay(attempt: number, baseMs: number, maxMs: number): number {
     const capped = Math.min(maxMs, baseMs * 2 ** Math.min(attempt, 30));
@@ -134,7 +137,7 @@ export async function erFetch<T = unknown>(req: ErHttpRequest): Promise<ErHttpRe
 
             const honourRetryAfter = response.status === 429 || response.status === 503;
             const delay = honourRetryAfter && apiError.retryAfterMs !== undefined
-                ? apiError.retryAfterMs
+                ? Math.min(apiError.retryAfterMs, maxRetryDelayMs, MAX_TIMER_MS)
                 : backoffDelay(attempt, retryDelayMs, maxRetryDelayMs);
             attempt += 1;
             await abortableSleep(delay, req.signal);

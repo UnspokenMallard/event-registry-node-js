@@ -51,6 +51,23 @@ describe("erFetch backoff", () => {
         await expect(promise).resolves.toMatchObject({ status: 200 });
     });
 
+    it("caps Retry-After at maxRetryDelayMs, even for values that would overflow setTimeout", async () => {
+        const responses = [fail(429, { "retry-after": "3600" }), fail(503, { "retry-after": "99999999999" }), ok()];
+        const fetchMock = vi.fn(async () => responses.shift() as Response);
+        vi.stubGlobal("fetch", fetchMock);
+        const promise = erFetch({ url: "https://x.test", retry: -1, retryDelayMs: 5000 });
+
+        await vi.advanceTimersByTimeAsync(29_999);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        await vi.advanceTimersByTimeAsync(29_999);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+        await expect(promise).resolves.toMatchObject({ status: 200 });
+    });
+
     it("keeps stop codes immediate and throws a typed ErApiError", async () => {
         const fetchMock = vi.fn(async () =>
             fail(403, { "x-request-id": "req-1", "req-tokens": "7" }, JSON.stringify({ error: { message: "no access", code: "E403" } })));
